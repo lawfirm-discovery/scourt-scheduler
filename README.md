@@ -46,3 +46,16 @@ KAKAO_NOTI_SECRET_KEY=
 KAKAO_NOTI_APP_KEY=
 KAKAO_NOTI_SENDER_KEY=
 ```
+
+## 업데이트 방법
+
+현재 깃 레포지토리에 ssh 키를 추가하여 ssh 로 연결이 됩니다.
+따라서 일반적인 깃 업데이트 방법에 따라 소스를 업데이트 후 서비스 재시작 하면 됩니다.
+
+```bash
+$ git pull
+$ sudo systemctl restart scourt-scheduler
+```
+
+\*\* 참고로 서비스 설정 파일은 `/etc/systemd/system/scourt-scheduler.service` 에 있고,
+해당 서비스 스크립트에서는 `{project_root}/run.sh` 파일을 실행합니다.
