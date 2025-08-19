@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import logging
+from math import e
 from typing import List
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -31,12 +32,12 @@ class SupremeCourtScheduler:
 
     async def start(self):
         # 디버깅용
-        self.scheduler.add_job(
-            self._runner, "date", run_date=datetime.now() + timedelta(seconds=10)
-        )
+        # self.scheduler.add_job(
+        #     self._runner, "date", run_date=datetime.now() + timedelta(seconds=10)
+        # )
 
-        # 매일 11시 0분, 17시 0분에 실행
-        # self.scheduler.add_job(self._runner, "cron", hour=11, minute=0)
+        # 매일 10시 0분, 17시 0분에 실행
+        self.scheduler.add_job(self._runner, "cron", hour=10, minute=0)
         # self.scheduler.add_job(self._runner, "cron", hour=17, minute=0)
 
         self.scheduler.start()
@@ -83,6 +84,9 @@ class SupremeCourtScheduler:
                     # 사건 번호 파싱
                     parsed_case_number = self._parse_case_number(case.case_number)
                     if not parsed_case_number:
+                        logger.info(
+                            f"사건번호가 형식에 맞지 않아서 사건 정보를 파싱하지 않습니다. 사건번호: {case.case_number}"
+                        )
                         continue
                     year, gubun, serial = parsed_case_number
 
@@ -101,43 +105,41 @@ class SupremeCourtScheduler:
                             agency_name=case.jurisdiction,
                         )
 
-                        if result.history or result.trial_info:
-                            if result.history:
-                                logger.info(
-                                    f"사건 이력 업데이트 완료. 사건번호: {case.case_number}, 업데이트 이력: {len(result.history)}건"
-                                )
-                            if result.trial_info:
-                                logger.info(
-                                    f"사건 변론기일 업데이트 완료. 사건번호: {case.case_number}, 업데이트 변론기일: {len(result.trial_info)}건"
-                                )
-
-                            # 변호사 및 소속 조직구성원
-                            target_users = await repo.get_related_users(
-                                author_id=case.author_id, firm_id=case.firm_id
-                            )
-
-                            # 사건 의뢰인(의뢰인에게 까지 보내야 하면 주석 해제)
-                            # target_users.extend(
-                            #     await repo.get_related_clients_by_case_id(
-                            #         case_id=case.case_id
-                            #     )
-                            # )
-
-                            # 알림톡 보내기
-                            # await self._send_alimtalk(
-                            #     target_users=target_users,
-                            #     case=case,
-                            #     history=result.history,
-                            #     trial_info=result.trial_info,
-                            # )
-
+                        await session.commit()
                     except Exception as e:
                         logger.error(
                             f"사건 정보를 파싱하는 중 오류가 발생했습니다. 사건번호: {case.case_number}, 오류: {str(e)}"
                         )
+                        await session.rollback()
                         continue
 
-                await session.commit()
+                    if not result.history and not result.trial_info:
+                        continue
+
+                    logger.info(
+                        f"대상사건: {case.title}({case.case_number}), 이력업데이트 {len(result.history) if result.history else 0}건, 기일업데이트 {len(result.trial_info) if result.trial_info else 0}건"
+                    )
+
+                    # 변호사 및 소속 조직구성원
+                    # target_users = await repo.get_related_users(
+                    #     author_id=case.author_id, firm_id=case.firm_id
+                    # )
+
+                    # 사건 의뢰인(의뢰인에게 까지 보내야 하면 주석 해제)
+                    # target_users.extend(
+                    #     await repo.get_related_clients_by_case_id(
+                    #         case_id=case.case_id
+                    #     )
+                    # )
+
+                    # 알림톡 보내기
+                    # await self._send_alimtalk(
+                    #     target_users=target_users,
+                    #     case=case,
+                    #     history=result.history,
+                    #     trial_info=result.trial_info,
+                    # )
+
                 skip += LIMIT
 
             logger.info("스케줄러 작업 종료")
@@ -148,7 +150,7 @@ class SupremeCourtScheduler:
         정규표현식을 사용해서 2025가단123456 형식을 year, gubun, serial로 분리합니다.
         [수정] gubun 에 해당하는 글자가 최대 4자까지 있음
         """
-        m = re.fullmatch(r"(\d{2,4})([가-힣]{1,4})(\d{3,6})", case_number)
+        m = re.fullmatch(r"(\d{2,4})([가-힣]{1,4})(\d{1,6})", case_number)
         if not m:
             return None
         year, gubun, serial = m.groups()
