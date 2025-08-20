@@ -149,8 +149,10 @@ class SupremeCourtScheduler:
         사건번호를 파싱합니다.
         정규표현식을 사용해서 2025가단123456 형식을 year, gubun, serial로 분리합니다.
         [수정] gubun 에 해당하는 글자가 최대 4자까지 있음
+        [수정] serial 에 해당하는 숫자가 최대 7자까지 있음
+        [수정] serial 뒤에 숫자가 아닌 추가표기(예: "(본소)")가 올 수 있으므로 이를 무시
         """
-        m = re.fullmatch(r"(\d{2,4})([가-힣]{1,4})(\d{1,6})", case_number)
+        m = re.fullmatch(r"(\d{2,4})([가-힣]{1,4})(\d{1,7})(?:\D.*)?", case_number)
         if not m:
             return None
         year, gubun, serial = m.groups()
