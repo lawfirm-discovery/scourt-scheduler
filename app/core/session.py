@@ -30,6 +30,11 @@ engine: AsyncEngine = create_async_engine(
     # echo=settings.DEBUG,
     pool_pre_ping=True,
     future=True,
+    connect_args={
+        "server_settings": {
+            "application_name": "scourt-scheduler",
+        }
+    },
 )
 
 # Async session factory
