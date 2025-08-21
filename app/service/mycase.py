@@ -394,3 +394,29 @@ class MyCaseService:
             clients.append(ClientResponse.model_validate(row))
 
         return clients
+
+    async def create_supremecourt_parse_history(
+        self, case_id: int, method: str | None, result: str | None
+    ) -> None:
+        """
+        캡차 크래커를 이용해서 나의사건정보를 파싱한 이력을 기록
+        """
+
+        await self.db.execute(
+            text(
+                """
+            INSERT INTO erp_supremecourt_parse_history (
+                case_id
+                , method
+                , result
+            ) VALUES (
+                :case_id
+                , :method
+                , :result
+            )
+            """
+            ),
+            {"case_id": case_id, "method": method, "result": result},
+        )
+
+        return None

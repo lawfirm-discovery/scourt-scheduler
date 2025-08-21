@@ -106,14 +106,14 @@ class ParseCaseService:
                         f"사건 정보 조회중 에러가 발생했습니다. message={detail.get('message')}",
                     )
                     raise Exception(
-                        f"사건 정보 조회중 에러가 발생했습니다. message={detail.get('message')}",
+                        f"{detail.get('message') or '상대 서버측의 알 수 없는 오류'}",
                     )
                 else:
                     raise Exception("사건 정보 조회중 에러가 발생했습니다.")
         except httpx.RequestError as e:
             # 네트워크 계층 오류 (연결/타임아웃 등)
             logger.error(f"네트워크 요청이 실패했습니다.")
-            raise Exception("네트워크 요청이 실패했습니다.")
+            raise Exception("네트워크 요청이 실패")
 
     async def parse_history_from_html(
         self, html: str

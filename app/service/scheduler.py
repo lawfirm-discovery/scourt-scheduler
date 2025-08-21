@@ -32,9 +32,9 @@ class SupremeCourtScheduler:
 
     async def start(self):
         # 디버깅용
-        # self.scheduler.add_job(
-        #     self._runner, "date", run_date=datetime.now() + timedelta(seconds=10)
-        # )
+        self.scheduler.add_job(
+            self._runner, "date", run_date=datetime.now() + timedelta(seconds=10)
+        )
 
         # 매일 10시 0분, 17시 0분에 실행
         self.scheduler.add_job(self._runner, "cron", hour=10, minute=0)
@@ -105,12 +105,23 @@ class SupremeCourtScheduler:
                             agency_name=case.jurisdiction,
                         )
 
+                        await repo.create_supremecourt_parse_history(
+                            case_id=case.case_id,
+                            method="scheduler",
+                            result="success",
+                        )
                         await session.commit()
                     except Exception as e:
                         logger.error(
                             f"사건 정보를 파싱하는 중 오류가 발생했습니다. 사건번호: {case.case_number}, 오류: {str(e)}"
                         )
                         await session.rollback()
+                        await repo.create_supremecourt_parse_history(
+                            case_id=case.case_id,
+                            method="scheduler",
+                            result=str(e),
+                        )
+                        await session.commit()
                         continue
 
                     if not result.history and not result.trial_info:
