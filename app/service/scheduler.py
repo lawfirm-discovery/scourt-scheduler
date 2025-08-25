@@ -132,29 +132,32 @@ class SupremeCourtScheduler:
                     )
 
                     # 변호사 및 소속 조직구성원
-                    target_users = await repo.get_related_users(
-                        author_id=case.author_id, firm_id=case.firm_id
-                    )
+                    if (
+                        case.firm_id == 1
+                    ):  # 테스트를 위해 일단 디스커버리 사건만 알림톡을 보낸다.
+                        target_users = await repo.get_related_users(
+                            author_id=case.author_id, firm_id=case.firm_id
+                        )
 
-                    # 테스트(테스트대표변호사, 테스트로펌)
-                    # target_users = await repo.get_related_users(
-                    #     author_id=72, firm_id=14
-                    # )
+                        # 테스트(테스트대표변호사, 테스트로펌)
+                        # target_users = await repo.get_related_users(
+                        #     author_id=72, firm_id=14
+                        # )
 
-                    # 사건 의뢰인(의뢰인에게 까지 보내야 하면 주석 해제)
-                    # target_users.extend(
-                    #     await repo.get_related_clients_by_case_id(
-                    #         case_id=case.case_id
-                    #     )
-                    # )
+                        # 사건 의뢰인(의뢰인에게 까지 보내야 하면 주석 해제)
+                        # target_users.extend(
+                        #     await repo.get_related_clients_by_case_id(
+                        #         case_id=case.case_id
+                        #     )
+                        # )
 
-                    # 알림톡 보내기
-                    await self._send_alimtalk(
-                        target_users=target_users,
-                        case=case,
-                        history=result.history,
-                        trial_info=result.trial_info,
-                    )
+                        # 알림톡 보내기
+                        await self._send_alimtalk(
+                            target_users=target_users,
+                            case=case,
+                            history=result.history,
+                            trial_info=result.trial_info,
+                        )
 
                 skip += LIMIT
 
@@ -184,28 +187,32 @@ class SupremeCourtScheduler:
         if not history and not trial_info:
             return
 
-        # if history:
-        #     for user in target_users:
-        #         if (
-        #             user.new_history == False
-        #         ):  # 명시적으로 거부한 경우(False)에는 보내지 않음. 즉 None 일때는 보냄
-        #             continue
+        if history:
+            for user in target_users:
+                if (
+                    user.new_history == False
+                ):  # 명시적으로 거부한 경우(False)에는 보내지 않음. 즉 None 일때는 보냄
+                    continue
 
-        #         try:
-        #             await self.alimtalk.send_message(
-        #                 template_code="CASE_NEW_HISTORY",
-        #                 recipient_no=user.phone,
-        #                 template_parameters={
-        #                     "사건명": case.title,
-        #                     "사건번호": case.case_number,
-        #                     "이력건수": len(history),
-        #                 },
-        #             )
-        #         except Exception as e:
-        #             logger.error(
-        #                 f"알림톡 전송 중 오류가 발생했습니다. 대상: {user.username}({user.phone}), 오류: {str(e)}"
-        #             )
-        #             continue
+                try:
+                    # 알림톡 기본 1000자 제한이 있다. 그래서 템플릿 기본 글자 약 230자를 제외하고 700자까지만 보냄
+                    await self.alimtalk.send_message(
+                        template_code="CASE_NEW_HISTORY",
+                        recipient_no=user.phone,
+                        template_parameters={
+                            "사건명": case.title,
+                            "사건번호": case.case_number,
+                            "등록건수": len(history),
+                            "진행내용": "\n".join(
+                                [f"{i+1}. {h.content}" for i, h in enumerate(history)]
+                            )[:700],
+                        },
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"알림톡 전송 중 오류가 발생했습니다. 대상: {user.username}({user.phone}), 오류: {str(e)}"
+                    )
+                    continue
 
         if trial_info:
             for user in target_users:

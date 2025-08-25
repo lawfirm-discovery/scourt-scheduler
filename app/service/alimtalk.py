@@ -10,7 +10,8 @@ NOTIFICATION_TEMPLATE_MAP = {
         "required_parameters": [
             "사건명",
             "사건번호",
-            "이력건수",
+            "등록건수",
+            "진행내용",
         ],
     },
     # 대법원 나의 사건 정보 변론기일 업데이트
