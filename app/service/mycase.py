@@ -19,9 +19,9 @@ class MyCaseService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_last_supremCourt_history_by_case_id(
+    async def get_supremCourt_history_by_case_id(
         self, case_id: int
-    ) -> Optional[CaseHistoryResponse]:
+    ) -> List[CaseHistoryResponse]:
         """
         대법원 나의 사건 정보를 통해 입력된 사건 이력 중 마지막 이력을 조회합니다.
         마지막 이력은 새로 받아온 정보 중에서 추가할 이력이 있는지 판단하기 위해 사용됩니다.
@@ -45,17 +45,16 @@ class MyCaseService:
                 his.case_id = :case_id
                 AND his.event_type = :event_type
             ORDER BY his.id DESC
-            LIMIT 1
             """
             ),
-            {"case_id": case_id, "event_type": CaseHistoryEventType.COURT},
+            {"case_id": case_id, "event_type": CaseHistoryEventType.COURT.value},
         )
-        row = result.fetchone()
+        rows = result.fetchall()
 
-        if not row:
-            return None
+        if not rows:
+            return []
 
-        return CaseHistoryResponse.model_validate(row)
+        return [CaseHistoryResponse.model_validate(row) for row in rows]
 
     async def create_case_history_from_supremCourt_history(
         self,
@@ -102,8 +101,8 @@ class MyCaseService:
             ),
             {
                 "case_id": case_id,
-                "event_type": CaseHistoryEventType.COURT,
-                "event_type2": CaseHistoryEventType2.ETC,
+                "event_type": CaseHistoryEventType.COURT.value,
+                "event_type2": CaseHistoryEventType2.ETC.value,
                 "prev_value": None,
                 "curr_value": None,
                 "details": content,
@@ -170,9 +169,7 @@ class MyCaseService:
 
         return row.id if row else 0
 
-    async def get_last_trial_info_by_case_id(
-        self, case_id: int
-    ) -> Optional[TrialInfoResponse]:
+    async def get_trial_info_by_case_id(self, case_id: int) -> List[TrialInfoResponse]:
         """
         ### 사건 변론기일 정보 중 마지막 변론기일을 조회합니다.
         마지막 변론기일은 새로 받아온 정보 중에서 추가할 변론기일이 있는지 판단하기 위해 사용됩니다.
@@ -188,22 +185,23 @@ class MyCaseService:
                 , trial.case_id
                 , trial.trial_date
                 , trial.trial_type
+                , trial.trial_agency_address_detail
+                , trial.trial_result
             FROM erp_case_trial_info trial
             WHERE 
                 trial.case_id = :case_id
                 AND trial.source = :source
             ORDER BY trial.trial_date DESC
-            LIMIT 1
             """
             ),
             {"case_id": case_id, "source": CaseHistoryEventType.COURT.value},
         )
-        row = result.fetchone()
+        rows = result.fetchall()
 
-        if not row:
-            return None
+        if not rows:
+            return []
 
-        return TrialInfoResponse.model_validate(row)
+        return [TrialInfoResponse.model_validate(row) for row in rows]
 
     async def get_case_list_for_scheduler(
         self, skip: int, limit: int

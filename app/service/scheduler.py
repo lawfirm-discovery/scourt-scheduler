@@ -32,9 +32,9 @@ class SupremeCourtScheduler:
 
     async def start(self):
         # 디버깅용
-        self.scheduler.add_job(
-            self._runner, "date", run_date=datetime.now() + timedelta(seconds=10)
-        )
+        # self.scheduler.add_job(
+        #     self._runner, "date", run_date=datetime.now() + timedelta(seconds=10)
+        # )
 
         # 매일 10시 0분, 17시 0분에 실행
         self.scheduler.add_job(self._runner, "cron", hour=10, minute=0)
@@ -66,6 +66,10 @@ class SupremeCourtScheduler:
                     break
 
                 for case in cases:
+                    # 테스트용
+                    # if case.case_id != 189:
+                    #     continue
+
                     logger.info(
                         f"스케줄러 작업 대상 사건: {case.title}, 사건번호: {case.case_number}"
                     )
@@ -105,6 +109,7 @@ class SupremeCourtScheduler:
                             agency_name=case.jurisdiction,
                         )
 
+                        # 스케줄러 동작 이력을 기록합니다.
                         await repo.create_supremecourt_parse_history(
                             case_id=case.case_id,
                             method="scheduler",
@@ -136,7 +141,9 @@ class SupremeCourtScheduler:
                         case.firm_id == 1
                     ):  # 테스트를 위해 일단 디스커버리 사건만 알림톡을 보낸다.
                         target_users = await repo.get_related_users(
-                            author_id=case.author_id, firm_id=case.firm_id
+                            # author_id=case.author_id, firm_id=case.firm_id
+                            author_id=72,
+                            firm_id=None,
                         )
 
                         # 테스트(테스트대표변호사, 테스트로펌)

@@ -1,10 +1,12 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import re
 from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 from bs4 import BeautifulSoup
 
+from app.schema.case_schema import CaseHistoryResponse, TrialInfoResponse
 from app.service.mycase import MyCaseService
 
 from app.schema.base import SchemaBase
@@ -49,6 +51,8 @@ class ParseCaseService:
         # 여기서 날짜 포맷을 정의해서 공통으로 사용합시다.
         self.date_fmt = "%Y.%m.%d"
         self.time_fmt = "%H:%M"
+        # 모든 날짜 비교/저장은 KST 기준으로 통일
+        self.tz = ZoneInfo("Asia/Seoul")
 
     async def get_html_from_capcha_server(
         self,
@@ -112,8 +116,8 @@ class ParseCaseService:
                     raise Exception("사건 정보 조회중 에러가 발생했습니다.")
         except httpx.RequestError as e:
             # 네트워크 계층 오류 (연결/타임아웃 등)
-            logger.error(f"네트워크 요청이 실패했습니다.")
-            raise Exception("네트워크 요청이 실패")
+            logger.error(f"네트워크 요청이 실패했습니다. {str(e)}")
+            raise Exception("네트워크 요청 실패")
 
     async def parse_history_from_html(
         self, html: str
@@ -254,72 +258,77 @@ class ParseCaseService:
     async def filter_history_for_update(
         self,
         parsed_results: List[SupremCourtHistoryParsedResult],
-        last_date: Optional[datetime] = None,
-        last_content: Optional[str] = None,
+        case_histories: List[CaseHistoryResponse],
     ) -> List[SupremCourtHistoryParsedResult]:
         """
         사건 이력 중 새로 받아온 사건 이력과
-        기존 사건 이력 중 마지막 사건 이력을 비교하여
+        기존 사건 이력을 모두 비교하여
         새로 받아온 사건 이력 중 추가할 사건 이력을 필터링합니다.
         """
 
-        if not last_date or not last_content:
+        if not case_histories:
             return parsed_results
 
-        # 날짜와 내용이 같은 이력의 인덱스를 찾아냅니다.
-        index = 0
-        for parsed_result in parsed_results:
-            if (
-                parsed_result.date == last_date.strftime(self.date_fmt)
-                and parsed_result.content == last_content
-            ):
-                break
-            index += 1
-
-        # 인덱스를 기준으로 리스트를 슬라이싱하여 새로 받아온 사건 이력 중 추가할 사건 이력을 필터링합니다.
-        parsed_results = parsed_results[index:]
-
-        if len(parsed_results) > 0:
-            logger.debug(
-                f"[이력 필터링 완료] (총 {len(parsed_results)}건 중 마지막 사건 이력: {parsed_results[-1].date}, {parsed_results[-1].content}"
+        # 사전에 기존 이력 키(date, content, result)를 set 로 변환
+        existing_keys = {
+            (
+                ch.created_at.astimezone(self.tz).strftime(self.date_fmt),
+                ch.details,
+                ch.result,
             )
+            for ch in case_histories
+        }
 
-        return parsed_results
+        # 필터링된 목록(새 객체로)
+        filtered = [
+            pr
+            for pr in parsed_results
+            if (pr.date, pr.content, pr.result) not in existing_keys
+        ]
+
+        return filtered
 
     async def filter_trial_info_for_update(
         self,
         parsed_results: List[SupremCourtTrialInfoParsedResult],
-        last_date: Optional[datetime] = None,
-        last_type: Optional[str] = None,
+        trial_info: List[TrialInfoResponse],
     ):
         """
         사건 변론기일 중 새로 받아온 사건 변론기일과
-        기존 사건 변론기일 중 마지막 사건 변론기일을 비교하여
+        기존 사건 변론기일을 비교하여
         새로 받아온 사건 변론기일 중 추가할 사건 변론기일이 있는지 판단합니다.
         """
 
-        if not last_date or not last_type:
+        if not trial_info:
             return parsed_results
 
-        index = 0
-        for parsed_result in parsed_results:
-            # 날짜와 시간, 변론기일 종류가 같은 변론기일의 인덱스를 찾아냅니다.
-            if (
-                parsed_result.date == last_date.strftime(self.date_fmt)
-                and parsed_result.time == last_date.strftime(self.time_fmt)
-                and parsed_result.type == last_type
-            ):
-                break
-            index += 1
-
-        parsed_results = parsed_results[index:]
-
-        if len(parsed_results) > 0:
-            logger.debug(
-                f"[변론기일 필터링 완료] (총 {len(parsed_results)}건 중 마지막 변론기일: {parsed_results[-1].date}, {parsed_results[-1].time}, {parsed_results[-1].type}"
+        # 사전에 기존 변론기일 키(trial_date 등)를 set 로 변환
+        existing_keys = {
+            (
+                ti.trial_date.astimezone(self.tz).strftime(self.date_fmt),
+                ti.trial_date.astimezone(self.tz).strftime(self.time_fmt),
+                ti.trial_type,
+                ti.trial_agency_address_detail,
+                ti.trial_result,
             )
+            for ti in trial_info
+        }
 
-        return parsed_results
+        # 필터링된 목록(새 객체로)
+        filtered = [
+            pr
+            for pr in parsed_results
+            if (
+                pr.date,
+                pr.time,
+                pr.type,
+                pr.location,
+                pr.result,
+            )
+            not in existing_keys
+        ]
+
+        return filtered
 
     async def update_case_history(
         self,
@@ -342,23 +351,18 @@ class ParseCaseService:
         # 사건 이력을 파싱합니다.
         parsed_results = await self.parse_history_from_html(html)
 
-        # 대법원 사건 이력 중 마지막 사건 이력을 조회합니다.
+        # 대법원 사건 이력을 조회합니다.
         case_history_repository = MyCaseService(self.db)
-        last_case_history = (
-            await case_history_repository.get_last_supremCourt_history_by_case_id(
-                case_id
-            )
+        case_histories = (
+            await case_history_repository.get_supremCourt_history_by_case_id(case_id)
         )
 
-        # 사건 이력 중 새로 받아온 사건 이력과 기존 사건 이력 중 마지막 사건 이력을 비교하여
+        # 사건 이력 중 새로 받아온 사건 이력과 기존 사건 이력을 모두 비교하여
         # 새로 받아온 사건 이력 중 추가할 사건 이력을 필터링합니다.
         filtered_results = await self.filter_history_for_update(
             parsed_results,
-            last_date=last_case_history.created_at if last_case_history else None,
-            last_content=last_case_history.details if last_case_history else None,
+            case_histories,
         )
-
-        # TODO: 추가할 새로운 사건 이력이 있으면 관련 유저들에게 알림 보내기
 
         try:
             # 사건 이력 중 새로 받아온 사건 이력 중 추가할 사건 이력을 추가합니다.
@@ -367,7 +371,9 @@ class ParseCaseService:
             for idx, parsed_result in enumerate(filtered_results):
                 # 사건 이력의 날짜를 datetime으로 변환하고
                 # seconds를 추가하여 사건 이력의 날짜를 구분합니다.(순서 보장)
-                base_dt = datetime.strptime(parsed_result.date, self.date_fmt)
+                base_dt = datetime.strptime(parsed_result.date, self.date_fmt).replace(
+                    tzinfo=self.tz
+                )
                 dt_with_seconds = base_dt + timedelta(seconds=idx)
                 await case_history_repository.create_case_history_from_supremCourt_history(
                     case_id=case_id,
@@ -409,19 +415,14 @@ class ParseCaseService:
 
         # 사건 변론기일 중 마지막 사건 변론기일을 조회합니다.
         case_history_repository = MyCaseService(self.db)
-        last_trial_info = await case_history_repository.get_last_trial_info_by_case_id(
-            case_id
-        )
+        trial_info = await case_history_repository.get_trial_info_by_case_id(case_id)
 
         # 사건 변론기일 중 새로 받아온 사건 변론기일과 기존 사건 변론기일 중 마지막 사건 변론기일을 비교하여
         # 새로 받아온 사건 변론기일 중 추가할 사건 변론기일이 있는지 판단합니다.
         filtered_results = await self.filter_trial_info_for_update(
             parsed_results,
-            last_date=last_trial_info.trial_date if last_trial_info else None,
-            last_type=last_trial_info.trial_type if last_trial_info else None,
+            trial_info=trial_info,
         )
-
-        # TODO: 추가할 새로운 사건 변론기일이 있으면 관련 유저들에게 알림 보내기
 
         try:
             # 사건 변론기일 중 새로 받아온 사건 변론기일 중 추가할 사건 변론기일을 추가합니다.
@@ -432,7 +433,7 @@ class ParseCaseService:
                     trial_date=datetime.strptime(
                         parsed_result.date + " " + parsed_result.time,
                         self.date_fmt + " " + self.time_fmt,
-                    ),
+                    ).replace(tzinfo=self.tz),
                     trial_type=parsed_result.type,
                     trial_agency=agency_name,
                     trial_agency_address_detail=parsed_result.location,

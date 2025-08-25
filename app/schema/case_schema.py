@@ -100,33 +100,16 @@ class CaseHistoryResponse(CaseHistoryBase):
     created_at: datetime = Field(..., description="사건 이력 생성 일자")
 
 
-class TrialInfoBase(SchemaBase):
-    """사건 변론기일 정보 기본 스키마"""
-
-    case_id: Optional[int] = Field(None, description="사건 ID")
-    attendee_id: Optional[int] = Field(None, description="참석자 ID")
-    attendee_name: Optional[str] = Field(None, description="참석자 이름")
-    trial_date: Optional[datetime] = Field(None, description="변론기일")
-    trial_agency: Optional[str] = Field(None, description="관할 기관")
-    trial_agency_address: Optional[str] = Field(None, description="관할 기관 주소")
-    trial_agency_address_detail: Optional[str] = Field(
-        None, description="관할 기관 상세 주소"
-    )
-    trial_agency_phone: Optional[str] = Field(None, description="관할 기관 전화번호")
-    trial_agency_fax: Optional[str] = Field(None, description="관할 기관 팩스번호")
-    trial_agency_email: Optional[str] = Field(None, description="관할 기관 이메일")
-    trial_agency_manager: Optional[str] = Field(None, description="관할 기관 담당자")
-    trial_agency_judge: Optional[str] = Field(None, description="관할 기관 판사")
-    trial_result: Optional[str] = Field(None, description="판결 결과")
-    trial_type: Optional[str] = Field(None, description="변론기일 종류")
-
-
-class TrialInfoResponse(TrialInfoBase):
+class TrialInfoResponse(SchemaBase):
     """사건 변론기일 정보 응답 스키마"""
 
     id: int = Field(..., description="변론기일 ID")
-    created_at: Optional[datetime] = Field(None, description="생성 일자")
-    updated_at: Optional[datetime] = Field(None, description="수정 일자")
+    trial_date: datetime = Field(..., description="변론기일 날짜")
+    trial_type: Optional[str] = Field(None, description="변론기일 종류")
+    trial_agency_address_detail: Optional[str] = Field(
+        None, description="변론기일 상세 주소"
+    )
+    trial_result: Optional[str] = Field(None, description="변론기일 결과")
 
 
 class CaseResponseForParser(SchemaBase):
