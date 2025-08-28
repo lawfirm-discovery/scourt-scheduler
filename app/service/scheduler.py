@@ -141,9 +141,10 @@ class SupremeCourtScheduler:
                         case.firm_id == 1
                     ):  # 테스트를 위해 일단 디스커버리 사건만 알림톡을 보낸다.
                         target_users = await repo.get_related_users(
-                            # author_id=case.author_id, firm_id=case.firm_id
-                            author_id=72,
-                            firm_id=None,
+                            author_id=case.author_id,
+                            firm_id=case.firm_id,
+                            # author_id=72,
+                            # firm_id=None,
                         )
 
                         # 테스트(테스트대표변호사, 테스트로펌)
