@@ -231,6 +231,15 @@ class MyCaseService:
                     ON cc.client_id = c.id
                 WHERE 
                     cc.case_id = ec.id
+                ORDER BY
+                    -- 형사사건의 경우 피고인/피의자로 조회해야 함.
+                    -- 일단 간단하게 사건 ec.case_type1 = '형사' 같은 조건 처리 없이
+                    -- 정렬 순서를 수정하는 방법으로 처리하였음.
+                    CASE 
+                        WHEN cc.litigant_role = '피고인' THEN 1
+                        WHEN cc.litigant_role = '피의자' THEN 2
+                        ELSE 3
+                    END
                 LIMIT 1
             ) AS client_name
         FROM 
