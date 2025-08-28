@@ -211,7 +211,11 @@ class SupremeCourtScheduler:
                             "사건번호": case.case_number,
                             "등록건수": len(history),
                             "진행내용": "\n".join(
-                                [f"{i+1}. {h.content}" for i, h in enumerate(history)]
+                                [
+                                    "",  # 첫줄에 개행문자(\n) 추가하기 위한 용도
+                                    f"{i+1}. {h.date} - {h.content}"
+                                    for i, h in enumerate(history)
+                                ]
                             )[:700],
                         },
                     )
