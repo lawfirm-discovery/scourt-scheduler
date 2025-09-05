@@ -9,7 +9,9 @@ NOTIFICATION_TEMPLATE_MAP = {
         "template_code": "CASE_NEW_HISTORY",
         "required_parameters": [
             "사건명",
+            "당사자",
             "사건번호",
+            "관할기관",
             "등록건수",
             "진행내용",
         ],
@@ -19,7 +21,9 @@ NOTIFICATION_TEMPLATE_MAP = {
         "template_code": "CASE_NEW_TRIAL",
         "required_parameters": [
             "사건명",
+            "당사자",
             "사건번호",
+            "관할기관",
             "날짜",
             "장소",
             "기일구분",  # trial_type

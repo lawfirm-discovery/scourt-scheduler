@@ -209,7 +209,9 @@ class SupremeCourtScheduler:
                         recipient_no=user.phone,
                         template_parameters={
                             "사건명": case.title,
+                            "당사자": case.client_name,
                             "사건번호": case.case_number,
+                            "관할기관": case.jurisdiction,
                             "등록건수": len(history),
                             "진행내용": "\n".join(
                                 ["\n"]  # 첫줄에 개행문자 추가하기 위한 용도
@@ -241,7 +243,9 @@ class SupremeCourtScheduler:
                         recipient_no=user.phone,
                         template_parameters={
                             "사건명": case.title,
+                            "당사자": case.client_name,
                             "사건번호": case.case_number,
+                            "관할기관": case.jurisdiction,
                             "날짜": trial_info[index].date,
                             "장소": trial_info[index].location,
                             "기일구분": trial_info[index].type,
