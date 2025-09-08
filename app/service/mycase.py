@@ -13,6 +13,11 @@ from app.schema.case_schema import (
     ClientResponse,
     TrialInfoResponse,
 )
+from app.schema.notification_schema import (
+    NotificationAction,
+    NotificationPriority,
+    NotificationType,
+)
 
 
 class MyCaseService:
@@ -427,3 +432,68 @@ class MyCaseService:
         )
 
         return None
+
+    async def create_system_notification(
+        self, title: str, content: str, case_id: int, user_id: int
+    ):
+        """
+        시스템 알림을 생성합니다.
+        """
+
+        result = await self.db.execute(
+            text(
+                f"""
+        INSERT INTO erp_notifications (
+            type
+            , action
+            , title
+            , content
+            , priority
+            , source
+            , source_id
+            , target_url
+            , extra_data
+            , user_id
+            , firm_id
+            , sender_id
+            , for_everyone
+        ) VALUES (
+            :type
+            , :action
+            , :title
+            , :content
+            , :priority
+            , :source
+            , :source_id
+            , :target_url
+            , :extra_data
+            , :user_id
+            , :firm_id
+            , :sender_id
+            , :for_everyone
+        ) RETURNING id
+        """
+            ),
+            {
+                "type": NotificationType.CASE,
+                "action": NotificationAction.CASE_HISTORY_ADDED,
+                "title": title,
+                "content": content,
+                "priority": NotificationPriority.MEDIUM,
+                "source": "case",
+                "source_id": case_id,
+                "target_url": None,
+                "extra_data": None,
+                "user_id": user_id,
+                "firm_id": None,
+                "sender_id": None,
+                "for_everyone": False,
+            },
+        )
+
+        row = result.fetchone()
+
+        if not row:
+            return None
+
+        return row.id

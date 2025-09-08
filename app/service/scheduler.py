@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import logging
+import asyncio
 from math import e
 from typing import List
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -167,6 +168,16 @@ class SupremeCourtScheduler:
                             trial_info=result.trial_info,
                         )
 
+                        # 시스템 알림 생성. 백그라운드 태스크로 실행
+                        asyncio.create_task(
+                            self._create_system_notification(
+                                target_users=target_users,
+                                case=case,
+                                history=result.history,
+                                trial_info=result.trial_info,
+                            )
+                        )
+
                 skip += LIMIT
 
             logger.info("스케줄러 작업 종료")
@@ -256,3 +267,48 @@ class SupremeCourtScheduler:
                         f"알림톡 전송 중 오류가 발생했습니다. 대상: {user.username}({user.phone}), 오류: {str(e)}"
                     )
                     continue
+
+    async def _create_system_notification(
+        self,
+        target_users: List[CaseRelatedUsers],
+        case: CaseResponseForParser,
+        history: List[SupremCourtHistoryParsedResult],
+        trial_info: List[SupremCourtTrialInfoParsedResult],
+    ):
+        async with AsyncSessionLocal() as session:
+            repo = MyCaseService(session)
+            if history:
+                for user in target_users:
+                    try:
+                        await repo.create_system_notification(
+                            title="사건의 새 진행내용이 추가되었습니다.",
+                            content=f"[{case.case_number}/{case.jurisdiction}] {case.title}",
+                            case_id=case.case_id,
+                            user_id=user.user_id,
+                        )
+                        await session.commit()
+                    except Exception as e:
+                        await session.rollback()
+                        logger.error(
+                            f"시스템 알림(진행내용) 생성 중 오류 - 대상: {user.username}({user.user_id}), 사건번호: {case.case_number}, 오류: {str(e)}"
+                        )
+
+            if trial_info:
+                for user in target_users:
+                    try:
+                        await repo.create_system_notification(
+                            title="사건의 새 기일이 추가되었습니다.",
+                            content=f"[{case.case_number}/{case.jurisdiction}] {case.title}",
+                            case_id=case.case_id,
+                            user_id=user.user_id,
+                        )
+                        await session.commit()
+                    except Exception as e:
+                        await session.rollback()
+                        logger.error(
+                            f"시스템 알림(기일) 생성 중 오류 - 대상: {user.username}({user.user_id}), 사건번호: {case.case_number}, 오류: {str(e)}"
+                        )
+
+            logger.info(
+                f"시스템 알림 생성 완료 - 사건번호: {case.case_number}, 대상자 수: {len(target_users)}"
+            )
