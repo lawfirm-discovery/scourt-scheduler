@@ -245,6 +245,8 @@ class MyCaseService:
                         WHEN cc.litigant_role = '피의자' THEN 2
                         ELSE 3
                     END
+                    -- 사건 의뢰인 등록 순으로 정렬. 먼저 등록된 사건 의뢰인을 우선.
+                    , cc.id ASC
                 LIMIT 1
             ) AS client_name
         FROM 
